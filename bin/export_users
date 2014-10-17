@@ -1,0 +1,95 @@
+#!/usr/bin/env ruby
+$LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), '../lib'))
+
+require 'ruby-progressbar'
+require 'onelogin'
+require 'optparse'
+require 'yaml'
+
+options = Hash.new
+mandatory = [:token, :format, :file]
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: #{$o} [options]"
+
+  opts.on('-t', '--token API_TOKEN', 'OneLogin API Token') { |token| options[:token] = token }
+  opts.on('-f', '--file FILE', 'Output file') { |file| options[:file] = file }
+  opts.on('-a', '--ansible', 'Export Ansible format') { |ansible| options[:format] = :ansible }
+  opts.on('-s', '--salt', 'Export Salt format') { |salt| options[:format] = :salt }
+end
+
+begin
+  optparse.parse!
+  missing = mandatory.select{ |param| options[param].nil? }
+  if not missing.empty?
+    puts "Missing options: #{missing.join(', ')}"
+    exit
+  end
+rescue OptionParser::InvalidOption, OptionParser::MissingArgument
+  puts $!.to_s
+  puts optparse
+  exit
+end
+
+api_key = options[:token]
+puts optparse if api_key.nil?
+
+onelogin =  OneLogin::API.new(api_key)
+onelogin.logger.level = Logger::ERROR
+
+puts "retrieving list of users"
+users = OneLogin::Users.all(onelogin)
+
+progressbar = ProgressBar.create(:title => "populating users", :starting_at => 0, :total => users.length, :format => '%e |%b>>%i| %p%% %t')
+
+users.each do |user|
+  if user.status_text == :active && ! user.uidgid.nil? && user.uidgid.is_a?(Numeric) && user.uidgid > 0 && ! user.sshpubkey.nil? && user.sshpubkey
+    if ! user.populated?
+      progressbar.log "user #{user.username} is being populated"
+      user.populate!(onelogin) 
+    else
+      progressbar.log "user #{user.username} is already populated"
+    end
+  else
+    progressbar.log "user #{user.username} has no sshpubkey and/or uidgid set"
+  end
+  progressbar.increment
+end
+progressbar.finish
+
+ssh_users = users.with_role('SSH')
+
+output = Hash.new
+output['users'] = Array.new
+output['users_deleted'] = Array.new
+case options[:format]
+when :ansible
+  ssh_users.each do |user|
+    output['users'].push({  'username' => user.username,
+                            'name' => "#{user.firstname} #{user.lastname}",
+                            'groups' => ['sudo'],
+                            'uid' => user.uidgid,
+                            'ssh_key' => [user.sshpubkey]
+                         })
+  end
+when :salt
+  ssh_users.each do |user|
+    output['users'].push({  user.username => {
+                            'fullname' => "#{user.firstname} #{user.lastname}",
+                            'crypt' => '',
+                            'uid' => user.uidgid,
+                            'gid' => user.uidgid,
+                            'groups' => ['sudo'],
+                            'pub_ssh_keys' => [user.sshpubkey]
+                          }
+                         })
+  end
+end
+users.each do |user|
+  if user.status_text != :active
+    output['users_deleted'].push({ 'username' => user.username })
+  end
+end
+
+puts "writing output file #{options[:file]}"
+File.write(options[:file], YAML.dump(output))
+puts "done"
