@@ -1,8 +1,9 @@
-require 'onelogin/version.rb'
-require 'onelogin/api.rb'
-require 'onelogin/role.rb'
-require 'onelogin/users.rb'
-require 'onelogin/user.rb'
+require 'onelogin/version'
+require 'onelogin/api'
+require 'onelogin/role'
+require 'onelogin/users'
+require 'onelogin/user'
+require 'onelogin/helper'
 
 module OneLogin
 end

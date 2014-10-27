@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), '../lib'))
 
-require 'ruby-progressbar'
 require 'onelogin'
 require 'optparse'
 require 'yaml'
@@ -39,22 +38,18 @@ onelogin.logger.level = Logger::ERROR
 puts "retrieving list of users"
 users = OneLogin::Users.all(onelogin)
 
-progressbar = ProgressBar.create(:title => "populating users", :starting_at => 0, :total => users.length, :format => '%e |%b>>%i| %p%% %t')
-
-users.each do |user|
+users.each_in_parallel(10) do |user|
   if user.status_text == :active && ! user.uidgid.nil? && user.uidgid.is_a?(Numeric) && user.uidgid > 0 && ! user.sshpubkey.nil? && user.sshpubkey
     if ! user.populated?
-      progressbar.log "user #{user.username} is being populated"
+      puts "user #{user.username} is being populated"
       user.populate!(onelogin) 
     else
-      progressbar.log "user #{user.username} is already populated"
+      puts "user #{user.username} is already populated"
     end
   else
-    progressbar.log "user #{user.username} has no sshpubkey and/or uidgid set"
+    puts "user #{user.username} has no sshpubkey and/or uidgid set"
   end
-  progressbar.increment
 end
-progressbar.finish
 
 ssh_users = users.with_role('SSH')
 
