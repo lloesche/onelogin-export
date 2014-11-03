@@ -11,9 +11,10 @@ optparse = OptionParser.new do |opts|
   opts.banner = "Usage: #{$o} [options]"
 
   opts.on('-t', '--token API_TOKEN', 'OneLogin API Token') { |token| options[:token] = token }
-  opts.on('-f', '--file FILE', 'Output file') { |file| options[:file] = file }
+  opts.on('-o', '--output FILE', 'Output file') { |file| options[:file] = file }
   opts.on('-a', '--ansible', 'Export Ansible format') { |ansible| options[:format] = :ansible }
   opts.on('-s', '--salt', 'Export Salt format') { |salt| options[:format] = :salt }
+  opts.on('-f', '--full', 'Full Export') { |salt| options[:format] = :full }
 end
 
 begin
@@ -35,16 +36,22 @@ puts optparse if api_key.nil?
 onelogin =  OneLogin::API.new(api_key)
 onelogin.logger.level = Logger::ERROR
 
-puts "retrieving list of users"
-users = OneLogin::Users.all(onelogin)
+begin
+  puts "retrieving list of users"
+  users = OneLogin::Users.all(onelogin)
+rescue Net::HTTPFatalError => e
+  puts "caught an exception: #{e.message} - retrying"
+  retry
+end
 
-users.each_in_parallel(10) do |user|
-  if user.status_text == :active && ! user.uidgid.nil? && user.uidgid.is_a?(Numeric) && user.uidgid > 0 && ! user.sshpubkey.nil? && user.sshpubkey
-    if ! user.populated?
-      puts "user #{user.username} is being populated"
-      user.populate!(onelogin) 
-    else
-      puts "user #{user.username} is already populated"
+users.each_in_parallel(50) do |user|
+  if options[:format] == :full || (user.status_text == :active && ! user.uidgid.nil? && user.uidgid.is_a?(Numeric) && user.uidgid > 0 && ! user.sshpubkey.nil? && user.sshpubkey)
+    puts "user #{user.username} is being populated"
+    begin
+      user.populate!(onelogin)
+    rescue Net::HTTPFatalError => e
+      puts "caught an exception: #{e.message} - retrying"
+      retry
     end
   else
     puts "user #{user.username} has no sshpubkey and/or uidgid set"
@@ -53,11 +60,12 @@ end
 
 ssh_users = users.with_role('SSH')
 
-output = Hash.new
-output['users'] = Array.new
-output['users_deleted'] = Array.new
+output_string = nil
 case options[:format]
 when :ansible
+  output = Hash.new
+  output['users'] = Array.new
+  output['users_deleted'] = Array.new
   ssh_users.each do |user|
     output['users'].push({  'username' => user.username,
                             'name' => "#{user.firstname} #{user.lastname}",
@@ -66,7 +74,15 @@ when :ansible
                             'ssh_key' => [user.sshpubkey]
                          })
   end
+  users.each do |user|
+    output['users_deleted'].push({ 'username' => user.username }) if user.status_text != :active
+  end
+  output_string = YAML.dump(output)
 when :salt
+  output = Hash.new
+  output_deleted = Hash.new
+  output['users'] = Array.new
+  output_deleted['deleted_users'] = Array.new
   ssh_users.each do |user|
     output['users'].push({  user.username => {
                             'fullname' => "#{user.firstname} #{user.lastname}",
@@ -78,13 +94,20 @@ when :salt
                           }
                          })
   end
-end
-users.each do |user|
-  if user.status_text != :active
-    output['users_deleted'].push({ 'username' => user.username })
+  users.each do |user|
+    output_deleted['deleted_users'].push(user.username) if user.status_text != :active
   end
+  output_string = YAML.dump(output)
+  output_string = output_string.gsub(/^- /, '  ')
+  output_deleted_string = YAML.dump(output_deleted)
+  output_deleted_string = output_deleted_string.gsub(/^---$/, '')
+  output_string += output_deleted_string
+when :full
+  output = users
+  output_string = YAML.dump(output)
 end
 
+
 puts "writing output file #{options[:file]}"
-File.write(options[:file], YAML.dump(output))
+File.write(options[:file], output_string)
 puts "done"
