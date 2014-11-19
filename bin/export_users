@@ -5,6 +5,8 @@ require 'onelogin'
 require 'optparse'
 require 'yaml'
 
+never_delete = ['root', 'bin', 'daemon', 'adm', 'lp', 'sync', 'shutdown', 'halt', 'mail', 'operator', 'games', 'ftp', 'nobody', 'dbus', 'avahi', 'avahi-autoipd', 'saslauth', 'libstoragemgmt', 'rpc', 'usbmuxd', 'radvd', 'unbound', 'rpcuser', 'nfsnobody', 'polkitd', 'qemu', 'abrt', 'postfix', 'sshd', 'ntp', 'chrony', 'tcpdump']
+
 options = Hash.new
 mandatory = [:token, :format, :file]
 optparse = OptionParser.new do |opts|
@@ -44,6 +46,7 @@ rescue Net::HTTPFatalError => e
   retry
 end
 
+users_without_sshkey = Array.new
 users.each_in_parallel(50) do |user|
   if options[:format] == :full || (user.status_text == :active && ! user.uidgid.nil? && user.uidgid.is_a?(Numeric) && user.uidgid > 0 && ! user.sshpubkey.nil? && user.sshpubkey)
     puts "user #{user.username} is being populated"
@@ -55,6 +58,7 @@ users.each_in_parallel(50) do |user|
     end
   else
     puts "user #{user.username} has no sshpubkey and/or uidgid set"
+    users_without_sshkey << user.username if user.username
   end
 end
 
@@ -65,7 +69,7 @@ case options[:format]
 when :ansible
   output = Hash.new
   output['users'] = Array.new
-  output['users_deleted'] = Array.new
+  output['users_deleted'] = users_without_sshkey
   ssh_users.each do |user|
     output['users'].push({  'username' => user.username,
                             'name' => "#{user.firstname} #{user.lastname}",
@@ -77,12 +81,13 @@ when :ansible
   users.each do |user|
     output['users_deleted'].push({ 'username' => user.username }) if user.status_text != :active
   end
+  output['users_deleted'] = output['users_deleted'] - never_delete
   output_string = YAML.dump(output)
 when :salt
   output = Hash.new
   output_deleted = Hash.new
   output['users'] = Array.new
-  output_deleted['deleted_users'] = Array.new
+  output_deleted['deleted_users'] = users_without_sshkey
   ssh_users.each do |user|
     output['users'].push({  user.username => {
                             'fullname' => "#{user.firstname} #{user.lastname}",
@@ -97,6 +102,7 @@ when :salt
   users.each do |user|
     output_deleted['deleted_users'].push(user.username) if user.status_text != :active
   end
+  output_deleted['deleted_users'] = output_deleted['deleted_users'] - never_delete
   output_string = YAML.dump(output)
   output_string = output_string.gsub(/^- /, '  ')
   output_deleted_string = YAML.dump(output_deleted)
