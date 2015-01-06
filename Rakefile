@@ -10,7 +10,7 @@ A library for exporting OneLogin users.
   spec.author = 'Lukas Loesche'
   spec.email = 'lukas@mesosphere.io'
   spec.homepage = 'http://www.mesosphere.io/'
-  spec.files = Dir['lib/*.rb']
+  spec.files = Dir['lib/**/*.rb']
   spec.bindir = 'bin'
   spec.executables << 'onelogin-user-export'
   spec.version = '0.1'

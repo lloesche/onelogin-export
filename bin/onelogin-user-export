@@ -81,7 +81,7 @@ when :ansible
   users.each do |user|
     output['users_deleted'].push({ 'username' => user.username }) if user.status_text != :active
   end
-  output['users_deleted'] = output['users_deleted'] - never_delete
+  output['users_deleted'] = output['users_deleted'].uniq - never_delete
   output_string = YAML.dump(output)
 when :salt
   output = Hash.new
@@ -102,7 +102,7 @@ when :salt
   users.each do |user|
     output_deleted['deleted_users'].push(user.username) if user.status_text != :active
   end
-  output_deleted['deleted_users'] = output_deleted['deleted_users'] - never_delete
+  output_deleted['deleted_users'] = output_deleted['deleted_users'].uniq - never_delete
   output_string = YAML.dump(output)
   output_string = output_string.gsub(/^- /, '  ')
   output_deleted_string = YAML.dump(output_deleted)
