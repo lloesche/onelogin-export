@@ -11,11 +11,23 @@ module OneLogin
     def self.all(onelogin)
       users = Array.new
       onelogin.logger.info "fetching users"
-      response = REXML::Document.new( onelogin.api_request({ service: 'users.xml' }) )
+      page = 1
+      more_users = true
 
-      XPath.each(response, "//users/user" ) do |user_xml|
-        user_xml = REXML::Document.new(user_xml.to_s)
-        users << User.from_xml(user_xml)
+      while more_users do
+        num_users = 0
+        response = REXML::Document.new( onelogin.api_request({ service: "users.xml?page=#{page}" }) )
+        XPath.each(response, "//users/user" ) do |user_xml|
+          user_xml = REXML::Document.new(user_xml.to_s)
+          users << User.from_xml(user_xml)
+          num_users += 1
+        end
+
+        page += 1
+        break if page > 1000 # failsafe
+
+        onelogin.logger.info "fetched #{num_users} users"
+        more_users = false if num_users == 0
       end
 
       Users.new(users)

@@ -4,6 +4,7 @@ $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), '../lib'))
 require 'onelogin'
 require 'optparse'
 require 'yaml'
+require 'unicode_utils'
 
 never_delete = ['root', 'bin', 'daemon', 'adm', 'lp', 'sync', 'shutdown', 'halt', 'mail', 'operator', 'games', 'ftp', 'nobody', 'dbus', 'avahi', 'avahi-autoipd', 'saslauth', 'libstoragemgmt', 'rpc', 'usbmuxd', 'radvd', 'unbound', 'rpcuser', 'nfsnobody', 'polkitd', 'qemu', 'abrt', 'postfix', 'sshd', 'ntp', 'chrony', 'tcpdump']
 
@@ -46,6 +47,10 @@ rescue Net::HTTPFatalError => e
   retry
 end
 
+def rm_nonascii(str)
+  UnicodeUtils.nfkd(str).gsub(/(\p{Letter})\p{Mark}+/,'\\1')
+end
+
 users_without_sshkey = Array.new
 users.each_in_parallel(50) do |user|
   if options[:format] == :full || (user.status_text == :active && ! user.uidgid.nil? && user.uidgid.is_a?(Numeric) && user.uidgid > 0 && ! user.sshpubkey.nil? && user.sshpubkey)
@@ -72,8 +77,9 @@ when :ansible
   output['users_deleted'] = users_without_sshkey
   ssh_users.each do |user|
     output['users'].push({  'username' => user.username,
-                            'name' => "#{user.firstname} #{user.lastname}",
+                            'name' => "#{rm_nonascii(user.firstname)} #{rm_nonascii(user.lastname)}",
                             'groups' => ['sudo'],
+                            'optional_groups' => ['docker'],
                             'uid' => user.uidgid,
                             'ssh_key' => [user.sshpubkey]
                          })
@@ -90,11 +96,12 @@ when :salt
   output_deleted['deleted_users'] = users_without_sshkey
   ssh_users.each do |user|
     output['users'].push({  user.username => {
-                            'fullname' => "#{user.firstname} #{user.lastname}",
+                            'fullname' => "#{rm_nonascii(user.firstname)} #{rm_nonascii(user.lastname)}",
                             'crypt' => '',
                             'uid' => user.uidgid,
                             'gid' => user.uidgid,
                             'groups' => ['sudo'],
+                            'optional_groups' => ['docker'],
                             'pub_ssh_keys' => [user.sshpubkey]
                           }
                          })
