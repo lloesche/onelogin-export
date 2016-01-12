@@ -1,17 +1,11 @@
 module OneLogin
   class User
-    attr_accessor :activated_at,
-                  :created_at,
-                  :email,
+    attr_accessor :email,
                   :firstname,
                   :lastname,
                   :id,
-                  :openid_name,
-                  :password_changed_at,
-                  :phone,
                   :status,
                   :status_text,
-                  :updated_at,
                   :username,
                   :sshpubkey,
                   :uidgid,
@@ -64,32 +58,13 @@ module OneLogin
       end
 
       user.id = REXML::XPath.first(user_xml, "//id").text.to_i
-
       user.username = REXML::XPath.first(user_xml, "//username").text
-      user.openid_name = REXML::XPath.first(user_xml, "//openid-name").text
-
-      user.created_at = REXML::XPath.first(user_xml, "//created-at").text
-      user.created_at = DateTime.parse(user.created_at) if ! user.created_at.nil?
-
-      user.activated_at = REXML::XPath.first(user_xml, "//activated-at").text
-      user.activated_at = DateTime.parse(user.activated_at) if ! user.activated_at.nil?
-
-      user.updated_at = REXML::XPath.first(user_xml, "//updated-at").text
-      user.updated_at = DateTime.parse(user.updated_at) if ! user.updated_at.nil?
-
-      user.password_changed_at = REXML::XPath.first(user_xml, "//password-changed-at").text
-      user.password_changed_at = DateTime.parse(user.password_changed_at) if ! user.password_changed_at.nil?
-
       user.firstname = REXML::XPath.first(user_xml, "//firstname").text
       user.lastname = REXML::XPath.first(user_xml, "//lastname").text
       user.email = REXML::XPath.first(user_xml, "//email").text
-      user.phone = REXML::XPath.first(user_xml, "//phone").text
-
       user.sshpubkey = REXML::XPath.first(user_xml, "//custom_attribute_sshpubkey").text
-
       user.uidgid = REXML::XPath.first(user_xml, "//custom_attribute_uidgid").text
       user.uidgid = user.uidgid.to_i if ! user.uidgid.nil?
-
       user.apachereviewboardname = REXML::XPath.first(user_xml, "//custom_attribute_apachereviewboardname").text
       user.githubname = REXML::XPath.first(user_xml, "//custom_attribute_githubname").text
 
