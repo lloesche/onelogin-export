@@ -13,7 +13,7 @@ A library for exporting OneLogin users.
   spec.files = Dir['lib/**/*.rb']
   spec.bindir = 'bin'
   spec.executables << 'onelogin-user-export'
-  spec.version = '0.2'
+  spec.version = '0.3'
   spec.add_dependency 'unicode_utils'
 end
 
