@@ -88,6 +88,7 @@ when :ansible
                             'groups' => ['sudo'],
                             'optional_groups' => ['docker'],
                             'uid' => user.uidgid,
+                            'shell' => user.shell,
                             'ssh_key' => [user.sshpubkey]
                          })
   end
@@ -105,6 +106,7 @@ when :salt
     output['users'].push({  user.username => {
                             'fullname' => "#{rm_nonascii(user.firstname)} #{rm_nonascii(user.lastname)}",
                             'crypt' => '',
+                            'shell' => user.shell,
                             'uid' => user.uidgid,
                             'gid' => user.uidgid,
                             'groups' => ['sudo'],

@@ -8,6 +8,7 @@ module OneLogin
                   :status_text,
                   :username,
                   :sshpubkey,
+                  :shell,
                   :uidgid,
                   :apachereviewboardname,
                   :githubname,
@@ -63,6 +64,7 @@ module OneLogin
       user.lastname = REXML::XPath.first(user_xml, "//lastname").text
       user.email = REXML::XPath.first(user_xml, "//email").text
       user.sshpubkey = REXML::XPath.first(user_xml, "//custom_attribute_sshpubkey").text
+      user.shell = REXML::XPath.first(user_xml, "//custom_attribute_shell").text
       user.uidgid = REXML::XPath.first(user_xml, "//custom_attribute_uidgid").text
       user.uidgid = user.uidgid.to_i if ! user.uidgid.nil?
       user.apachereviewboardname = REXML::XPath.first(user_xml, "//custom_attribute_apachereviewboardname").text
